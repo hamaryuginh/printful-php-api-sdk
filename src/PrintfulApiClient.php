@@ -10,48 +10,65 @@ use Printful\Exceptions\PrintfulException;
  */
 class PrintfulApiClient
 {
-    const TYPE_LEGACY_STORE_KEY = 'legacy-store-key';
-    const TYPE_OAUTH_TOKEN = 'oauth-token';
-    const DEFAULT_KEY = self::TYPE_LEGACY_STORE_KEY;
+    final public const LOCALE_EN_US = 'en_US';
+    final public const LOCALE_ES_ES = 'es_ES';
+    final public const LOCALE_FR_FR = 'fr_FR';
+    final public const LOCALE_DE_DE = 'de_DE';
+    final public const LOCALE_IT_IT = 'it_IT';
+    final public const DEFAULT_LOCALE = self::LOCALE_EN_US;
+    final public const AVAILABLE_LOCALES = [
+        self::LOCALE_EN_US,
+        self::LOCALE_ES_ES,
+        self::LOCALE_FR_FR,
+        self::LOCALE_DE_DE,
+        self::LOCALE_IT_IT,
+    ];
+
+    final public const TYPE_LEGACY_STORE_KEY = 'legacy-store-key';
+    final public const TYPE_OAUTH_TOKEN = 'oauth-token';
+    final public const DEFAULT_KEY = self::TYPE_LEGACY_STORE_KEY;
+
+    final public const USER_AGENT = 'Printful PHP API SDK 2.0';
 
     /**
      * Printful API key
      * @var string|null
      */
-    protected $legacyStoreKey;
+    protected ?string $legacyStoreKey;
 
     /**
      * Printful OAuth token
      * @var string|null
      */
-    protected $oauthToken;
+    protected ?string $oauthToken;
 
-    protected $lastResponseRaw;
+    protected ?string $lastResponseRaw;
 
-    protected $lastResponse;
+    protected ?array $lastResponse;
 
-    public $url = 'https://api.printful.com/';
+    protected string $currentLocale = self::DEFAULT_LOCALE;
 
-    const USER_AGENT = 'Printful PHP API SDK 2.0';
+    public string $url = 'https://api.printful.com/';
 
     /**
      * Maximum amount of time in seconds that is allowed to make the connection to the API server
      * @var int
      */
-    public $curlConnectTimeout = 20;
+    public int $curlConnectTimeout = 20;
 
     /**
      * Maximum amount of time in seconds to which the execution of cURL call will be limited
      * @var int
      */
-    public $curlTimeout = 20;
+    public int $curlTimeout = 20;
 
     /**
      * @param string $key
      * @param string $type // PrintfulApiClient::TYPE_LEGACY_STORE_KEY or PrintfulApiClient::TYPE_OAUTH_TOKEN
-     * @throws \Printful\Exceptions\PrintfulException if the library failed to initialize
+     *
+     * @throws PrintfulException if the library failed to initialize
      */
-    public function __construct($key, $type = self::DEFAULT_KEY)
+    public function __construct(string $key, string $type = self::DEFAULT_KEY)
     {
         if ($type === self::TYPE_LEGACY_STORE_KEY && strlen($key) < 32) {
             throw new PrintfulException('Invalid Printful store key!');
@@ -62,83 +79,101 @@ class PrintfulApiClient
     }
 
     /**
-     * @param string $oAuthToken
      * @throws PrintfulException
      */
-    public static function createOauthClient($oAuthToken)
+    public static function createOauthClient(string $oAuthToken): self
     {
         return new self($oAuthToken, self::TYPE_OAUTH_TOKEN);
     }
 
     /**
-     * @param string $legacyStoreKey
      * @throws PrintfulException
      */
-    public static function createLegacyStoreKeyClient($legacyStoreKey)
+    public static function createLegacyStoreKeyClient(string $legacyStoreKey): self
     {
         return new self($legacyStoreKey, self::TYPE_LEGACY_STORE_KEY);
     }
 
+    public function getCurrentLocale(): string
+    {
+        return $this->currentLocale;
+    }
+
+    public function setCurrentLocale(string $currentLocale): self
+    {
+        if (in_array($currentLocale, self::AVAILABLE_LOCALES)) {
+            $this->currentLocale = $currentLocale;
+        }
+
+        return $this;
+    }
+
     /**
      * Returns total available item count from the last request if it supports paging (e.g order list) or null otherwise.
-     *
-     * @return int|null Item count
      */
-    public function getItemCount()
+    public function getItemCount(): ?int
     {
         return isset($this->lastResponse['paging']['total']) ? $this->lastResponse['paging']['total'] : null;
     }
 
     /**
      * Perform a GET request to the API
+     *
      * @param string $path Request path (e.g. 'orders' or 'orders/123')
-     * @param array $params Additional GET parameters as an associative array
+     * @param array  $params Additional GET parameters as an associative array
+     *
      * @return mixed API response
-     * @throws \Printful\Exceptions\PrintfulApiException if the API call status code is not in the 2xx range
+     * @throws PrintfulApiException if the API call status code is not in the 2xx range
      * @throws PrintfulException if the API call has failed or the response is invalid
      */
-    public function get($path, $params = [])
+    public function get(string $path, array $params = []): mixed
     {
         return $this->request('GET', $path, $params);
     }
 
     /**
      * Perform a DELETE request to the API
+     *
      * @param string $path Request path (e.g. 'orders' or 'orders/123')
-     * @param array $params Additional GET parameters as an associative array
+     * @param array  $params Additional GET parameters as an associative array
+     *
      * @return mixed API response
-     * @throws \Printful\Exceptions\PrintfulApiException if the API call status code is not in the 2xx range
-     * @throws \Printful\Exceptions\PrintfulException if the API call has failed or the response is invalid
+     * @throws PrintfulApiException if the API call status code is not in the 2xx range
+     * @throws PrintfulException if the API call has failed or the response is invalid
      */
-    public function delete($path, $params = [])
+    public function delete(string $path, array $params = []): mixed
     {
         return $this->request('DELETE', $path, $params);
     }
 
     /**
      * Perform a POST request to the API
+     *
      * @param string $path Request path (e.g. 'orders' or 'orders/123')
-     * @param array $data Request body data as an associative array
-     * @param array $params Additional GET parameters as an associative array
+     * @param array  $data Request body data as an associative array
+     * @param array  $params Additional GET parameters as an associative array
+     *
      * @return mixed API response
-     * @throws \Printful\Exceptions\PrintfulApiException if the API call status code is not in the 2xx range
+     * @throws PrintfulApiException if the API call status code is not in the 2xx range
      * @throws PrintfulException if the API call has failed or the response is invalid
      */
-    public function post($path, $data = [], $params = [])
+    public function post(string $path, array $data = [], array $params = []): mixed
     {
         return $this->request('POST', $path, $params, $data);
     }
 
     /**
      * Perform a PUT request to the API
+     *
      * @param string $path Request path (e.g. 'orders' or 'orders/123')
-     * @param array $data Request body data as an associative array
-     * @param array $params Additional GET parameters as an associative array
+     * @param array  $data Request body data as an associative array
+     * @param array  $params Additional GET parameters as an associative array
+     *
      * @return mixed API response
-     * @throws \Printful\Exceptions\PrintfulApiException if the API call status code is not in the 2xx range
-     * @throws \Printful\Exceptions\PrintfulException if the API call has failed or the response is invalid
+     * @throws PrintfulApiException if the API call status code is not in the 2xx range
+     * @throws PrintfulException if the API call has failed or the response is invalid
      */
-    public function put($path, $data = [], $params = [])
+    public function put(string $path, array $data = [], array $params = []): mixed
     {
         return $this->request('PUT', $path, $params, $data);
     }
@@ -147,7 +182,7 @@ class PrintfulApiClient
      * Return raw response data from the last request
      * @return string|null Response data
      */
-    public function getLastResponseRaw()
+    public function getLastResponseRaw(): ?string
     {
         return $this->lastResponseRaw;
     }
@@ -156,22 +191,23 @@ class PrintfulApiClient
      * Return decoded response data from the last request
      * @return array|null Response data
      */
-    public function getLastResponse()
+    public function getLastResponse(): ?array
     {
         return $this->lastResponse;
     }
 
     /**
      * Internal request implementation
-     * @param string $method POST, GET, etc.
-     * @param string $path
-     * @param array $params
-     * @param mixed $data
-     * @return
-     * @throws \Printful\Exceptions\PrintfulApiException
-     * @throws \Printful\Exceptions\PrintfulException
+     *
+     * @param string     $method POST, GET, etc.
+     * @param string     $path
+     * @param array      $params
+     * @param mixed|null $data
+     *
+     * @throws PrintfulApiException
+     * @throws PrintfulException
      */
-    protected function request($method, $path, array $params = [], $data = null)
+    protected function request(string $method, string $path, array $params = [], mixed $data = null): mixed
     {
         $this->lastResponseRaw = null;
         $this->lastResponse = null;
@@ -196,6 +232,8 @@ class PrintfulApiClient
 
         curl_setopt($curl, CURLOPT_USERAGENT, self::USER_AGENT);
 
+        curl_setopt($curl, CURLOPT_HTTPHEADER, ['X-PF-Language' => $this->getCurrentLocale()]);
+
         if ($data !== null) {
             curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
         }
@@ -217,12 +255,14 @@ class PrintfulApiClient
             $e->rawResponse = $this->lastResponseRaw;
             throw $e;
         }
+
         $status = (int)$response['code'];
         if ($status < 200 || $status >= 300) {
             $e = new PrintfulApiException((string)$response['result'], $status);
             $e->rawResponse = $this->lastResponseRaw;
             throw $e;
         }
+
         return $response['result'];
     }
 
@@ -230,7 +270,7 @@ class PrintfulApiClient
      * @param resource $curl
      * @throws PrintfulException
      */
-    protected function setCredentials($curl)
+    protected function setCredentials($curl): void
     {
         if ($this->oauthToken !== null) {
             curl_setopt($curl, CURLOPT_HTTPHEADER, ["Authorization: Bearer $this->oauthToken"]);
