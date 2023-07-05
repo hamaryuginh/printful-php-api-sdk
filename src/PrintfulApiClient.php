@@ -18,17 +18,17 @@ class PrintfulApiClient
      * Printful API key
      * @var string|null
      */
-    private $legacyStoreKey;
+    protected $legacyStoreKey;
 
     /**
      * Printful OAuth token
      * @var string|null
      */
-    private $oauthToken;
+    protected $oauthToken;
 
-    private $lastResponseRaw;
+    protected $lastResponseRaw;
 
-    private $lastResponse;
+    protected $lastResponse;
 
     public $url = 'https://api.printful.com/';
 
@@ -171,7 +171,7 @@ class PrintfulApiClient
      * @throws \Printful\Exceptions\PrintfulApiException
      * @throws \Printful\Exceptions\PrintfulException
      */
-    private function request($method, $path, array $params = [], $data = null)
+    protected function request($method, $path, array $params = [], $data = null)
     {
         $this->lastResponseRaw = null;
         $this->lastResponse = null;
@@ -230,7 +230,7 @@ class PrintfulApiClient
      * @param resource $curl
      * @throws PrintfulException
      */
-    private function setCredentials($curl)
+    protected function setCredentials($curl)
     {
         if ($this->oauthToken !== null) {
             curl_setopt($curl, CURLOPT_HTTPHEADER, ["Authorization: Bearer $this->oauthToken"]);
